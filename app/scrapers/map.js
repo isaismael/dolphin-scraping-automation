@@ -7,7 +7,7 @@ const Map = {
     "Yuhmak": ScraperYuhmak,
     "Fravega": ScraperFravega,
     "Castillo": ScraperCastillo,
-    "Barbieri": ScraperBarbieri,
+    "Oscar Barbieri": ScraperBarbieri,
 };
 
 module.exports = Map;

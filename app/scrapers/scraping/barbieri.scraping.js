@@ -1,18 +1,23 @@
 const { chromium } = require('playwright');
-const ItemsRepository = require('../../repositories/items/items.repository');
-const SellerRepository = require('../../repositories/seller/seller.repository');
+const CategoryRepository = require('../../repositories/category.repository')
+const SkuServices = require('../../services/sku.services');
+const Sellerservices = require('../../services/seller.services');
+const ScrapingServices = require('../../services/scraping.services');
+
 const TagsBarbieri = require('../tags/barbieri.tags');
 
 class ScraperBarbieri {
     constructor() {
-        this.itemsRepository = new ItemsRepository();
-        this.sellerRepository = new SellerRepository();
+        this.sellerservices = Sellerservices;
+        this.skuServices = SkuServices;
+        this.scrapingServices = ScrapingServices;
+        this.categoryRepository = CategoryRepository;
     }
 
     async scrape() {
         console.log(" - - - - - Inicio de ScraperBarbieri.scrape - - - - - ");
 
-        const items = await this.itemsRepository.get_active_items();
+        const items = await this.skuServices.getSkuAtive();
         const browser = await chromium.launch({ headless: true });
         const context = await browser.newContext();
         const page = await context.newPage();
@@ -20,7 +25,8 @@ class ScraperBarbieri {
 
         try {
             for (let item of items) {
-                const item_for_search = `${item.category_name} ${item.brand_name} ${item.supplier_id}`;
+                const category = await this.categoryRepository.categoryById(item.subcategory);
+                const item_for_search = `${category.name} ${item.brand_name} ${item.supplier_code}`;
                 try {
                     // ->
                     await page.goto(TagsBarbieri["url"]);
@@ -84,7 +90,8 @@ class ScraperBarbieri {
 
                         // => objeto final
                         Object.assign(product, {
-                            item_id: item.id,
+                            product_id: item.product_id,
+                            sku_id: item.id,
                             seller_id: TagsBarbieri["seller_id"],
                             seller_item_url: seller_item_url,
                             older_price: older_price,
@@ -93,9 +100,11 @@ class ScraperBarbieri {
                             payment_rules: payment_rules,
                             shipping_data: shipping_data,
                             image_url: image_url,
+                            product_url: page.url(),
                             active: item.is_active,
-                        })
-                        await this.sellerRepository.upsert_product(product);
+                        });
+
+                        await this.scrapingServices.createOrUpdateScraping(product);
                     }
                     else {
                         console.log(`${item_for_search}: No hay match...`);

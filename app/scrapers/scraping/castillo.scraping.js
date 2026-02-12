@@ -1,13 +1,18 @@
 const { chromium } = require('playwright');
-const ItemsRepository = require('../../repositories/items/items.repository');
-const SellerRepository = require('../../repositories/seller/seller.repository');
-const TagsCastillo = require('../tags/castillo.tags');
+const CategoryRepository = require('../../repositories/category.repository')
+const SkuServices = require('../../services/sku.services');
+const Sellerservices = require('../../services/seller.services');
+const ScrapingServices = require('../../services/scraping.services');
+
 const SafeHelpers = require('../../helpers/safe.helper');
+const TagsCastillo = require('../tags/castillo.tags');
 
 class ScraperCastillo {
     constructor() {
-        this.itemsRepository = new ItemsRepository();
-        this.sellerRepository = new SellerRepository();
+        this.sellerservices = Sellerservices;
+        this.skuServices = SkuServices;
+        this.scrapingServices = ScrapingServices;
+        this.categoryRepository = CategoryRepository;
         this.safeHelpers = new SafeHelpers();
         this.SafeWait = this.safeHelpers.SafeWait;
         this.safeClick = this.safeHelpers.safeClick;
@@ -16,7 +21,7 @@ class ScraperCastillo {
     async scrape() {
         console.log(" - - - - - Inicio de ScraperCastillo.scrape - - - - - ");
 
-        const items = await this.itemsRepository.get_active_items();
+        const items = await this.skuServices.getSkuAtive();
         const browser = await chromium.launch({ headless: true });
         const context = await browser.newContext();
         const page = await context.newPage();
@@ -24,7 +29,8 @@ class ScraperCastillo {
 
         try {
             for (let item of items) {
-                const item_for_search = `${item.category_name} ${item.brand_name} ${item.supplier_id}`;
+                const category = await this.categoryRepository.categoryById(item.subcategory);
+                const item_for_search = `${category.name} ${item.brand_name} ${item.supplier_code}`;
                 try {
                     // ->
                     await page.goto(TagsCastillo["url"]);
@@ -38,8 +44,16 @@ class ScraperCastillo {
                     if (await this.SafeWait(page, TagsCastillo["modal_notification"], 2000)) {
                         await this.safeClick(page, TagsCastillo["btn_modal_no"], 2000);
                     }
+                    if (await this.SafeWait(page, TagsCastillo["modal_exclusiva"], 2000)) {
+                        await this.safeClick(page, TagsCastillo["modal_exclusiva"], 2000);
+                    }
+                    //)
                     // ->
-                    await page.click(TagsCastillo["btn_area_code"]);
+                    const areaBtn = page.locator(TagsCastillo["btn_area_code"]);
+                    if (await areaBtn.count() > 0) {
+                        await areaBtn.first().click({ timeout: 5000 });
+                    }
+
                     await page.fill(TagsCastillo["input_area_code"], "4000");
                     await page.click(TagsCastillo["submit_area_code"]);
                     await page.waitForTimeout(2000);
@@ -82,7 +96,8 @@ class ScraperCastillo {
 
 
                     Object.assign(product, {
-                        item_id: item.id,
+                        product_id: item.product_id,
+                        sku_id: item.id,
                         seller_id: TagsCastillo["seller_id"],
                         seller_item_url: seller_item_url,
                         older_price: older_price,
@@ -91,10 +106,11 @@ class ScraperCastillo {
                         payment_rules: payment_rules,
                         shipping_data: shipping_data,
                         image_url: image_url,
+                        product_url: page.url(),
                         active: item.is_active,
                     })
 
-                    await this.sellerRepository.upsert_product(product);
+                    await this.scrapingServices.createOrUpdateScraping(product);
 
                 } catch (error) {
                     console.error(`Error con item ${item_for_search}:`, error.message);

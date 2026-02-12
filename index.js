@@ -1,22 +1,27 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const app = require('./automation/app');
-
-dotenv.config();
+const App = require('./app/app');
+const db = require('./app/models');
 
 class Server {
     constructor() {
-        this.appInstance = new app();
-        this.port = process.env.PORT || 3000;
+        this.app = App;
     }
-    async Init() {
-        express()
-            .listen(this.port, () => {
-                console.log(`Automatización corriendo en el port ${this.port}...`);
-            });
-        await this.appInstance.start();
+
+    async init() {
+        try {
+            await db.sequelize.authenticate();
+            console.log("Conexion exitosa!");
+
+            await db.sequelize.sync();
+            console.log("Tablas sincronizadas!");
+
+        } catch (error) {
+            console.error("Error al inicializar dolphi-scraping-automation: ", error.message);
+            process.exit(1);
+        }
+        await this.app.init();
     }
+
 }
 
 const server = new Server();
-server.Init();
+server.init();

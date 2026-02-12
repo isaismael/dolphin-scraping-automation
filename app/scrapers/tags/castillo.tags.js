@@ -1,5 +1,6 @@
 const TagsCastillo = {
     "url": "https://www.castillo.com.ar/",
+    "modal_exclusiva": "div._dp_close",
     "modal_bienvenidos": "#wpnDialogcontainer",
     "modal_bienvenido_btn": "#btnNoIdWpnPush",
     "modal_notification": "div#cdh_push-modal",
